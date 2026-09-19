@@ -1,0 +1,481 @@
+\documentclass[12pt,a4paper]{article}
+
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[french]{babel}
+\usepackage{geometry}
+\usepackage{amsmath,amssymb}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{xcolor}
+\usepackage{float}
+\usepackage{hyperref}
+\usepackage{enumitem}
+\usepackage{tikz}
+\usepackage{pgfplots}
+\usepackage{fancyhdr}
+\pgfplotsset{compat=1.18}
+
+\geometry{margin=2.4cm}
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{6pt}
+
+\pagestyle{fancy}
+\fancyhf{}
+\lhead{Master 1 Informatique}
+\rhead{Nuées dynamiques}
+\cfoot{\thepage}
+
+\title{\textbf{IMPLÉMENTATION DE L'ALGORITHME DES NUÉES DYNAMIQUES}\\
+\large Implémentation « from scratch »}
+\author{KILO YOYO GRADI}
+\date{2025--2026}
+
+\begin{document}
+
+% ============================================================
+% PAGE DE GARDE
+% ============================================================
+\begin{titlepage}
+\centering
+\vspace*{1.5cm}
+
+{\Large \textbf{UNIVERSITÉ DE KINSHASA}}\\[0.4cm]
+{\large Faculté des Sciences et Technologies}\\[0.5cm]
+{\large \textbf{MASTER 1 INFORMATIQUE}}\\[2cm]
+
+{\Huge \textbf{TRAVAUX PRATIQUES}}\\[0.8cm]
+{\LARGE \textbf{IMPLÉMENTATION DE L'ALGORITHME DES NUÉES DYNAMIQUES}}\\[0.5cm]
+{\large \textit{Implémentation « from scratch »}}\\[2cm]
+
+\begin{tabular}{ll}
+\textbf{Étudiant :} & KILO YOYO GRADI\\[0.4cm]
+\textbf{Année académique :} & 2025--2026\\[0.4cm]
+\textbf{Langage :} & Python\\[0.4cm]
+\textbf{Code source :} & GitHub
+\end{tabular}
+
+\vfill
+{\large \textbf{Rapport de travaux pratiques}}
+\end{titlepage}
+
+\tableofcontents
+\newpage
+
+% ============================================================
+% 1 INTRODUCTION
+% ============================================================
+\section{Introduction}
+
+La classification automatique constitue une étape importante de l'analyse des données. Elle permet de regrouper des observations présentant des caractéristiques similaires. Lorsque les catégories ne sont pas connues à l'avance, on parle de classification non supervisée ou de clustering.
+
+L'algorithme des nuées dynamiques est une méthode itérative de classification fondée sur des prototypes. Chaque observation est affectée au prototype le plus proche, puis les prototypes sont recalculés à partir des observations qui leur sont associées. Ces deux opérations sont répétées jusqu'à ce que les prototypes deviennent suffisamment stables.
+
+Dans ce travail pratique, l'objectif est d'implémenter l'algorithme \textbf{from scratch}, c'est-à-dire sans utiliser directement une implémentation toute faite de type \texttt{KMeans}. Les principales opérations mathématiques sont donc programmées directement en Python.
+
+L'expérimentation porte sur un ensemble artificiel de données bidimensionnelles. Trois groupes de points sont générés autour de centres différents. Cette représentation permet de visualiser les \textbf{nuages de points}, les prototypes et la partition finale.
+
+\section{Objectifs}
+
+Les objectifs de ce TP sont :
+
+\begin{itemize}
+    \item comprendre le principe des nuées dynamiques ;
+    \item étudier la classification non supervisée ;
+    \item formaliser la distance utilisée et la fonction objectif ;
+    \item programmer l'algorithme sans bibliothèque de clustering prête à l'emploi ;
+    \item générer un jeu de données composé de plusieurs nuages de points ;
+    \item affecter les observations aux classes correspondant aux prototypes les plus proches ;
+    \item observer le déplacement des prototypes ;
+    \item représenter graphiquement les nuages obtenus ;
+    \item analyser la convergence de l'algorithme ;
+    \item publier le code source dans un dépôt GitHub.
+\end{itemize}
+
+\section{Problématique}
+
+La problématique étudiée est la suivante :
+
+\begin{quote}
+\textit{Comment partitionner automatiquement un ensemble d'observations en un nombre fixé de classes homogènes, en minimisant la dispersion des observations autour de leurs prototypes, tout en implémentant manuellement les différentes étapes de l'algorithme ?}
+\end{quote}
+
+% ============================================================
+% 2 THEORIE
+% ============================================================
+\section{Fondements théoriques}
+
+Soit un ensemble de $n$ observations :
+
+\[
+X=\{x_1,x_2,\ldots,x_n\},
+\]
+
+où chaque observation $x_i$ appartient à $\mathbb{R}^d$. L'objectif est de construire $K$ classes :
+
+\[
+C_1,C_2,\ldots,C_K.
+\]
+
+Chaque classe est représentée par un prototype :
+
+\[
+\mu_1,\mu_2,\ldots,\mu_K.
+\]
+
+Dans notre expérimentation, la distance choisie est la distance euclidienne :
+
+\[
+d(x_i,\mu_j)=
+\sqrt{\sum_{p=1}^{d}(x_{ip}-\mu_{jp})^2}.
+\]
+
+L'observation $x_i$ est affectée à la classe dont le prototype est le plus proche :
+
+\[
+c_i=\arg\min_{j\in\{1,\ldots,K\}}d(x_i,\mu_j).
+\]
+
+Après l'affectation, le prototype de la classe $j$ est recalculé comme la moyenne des observations qui appartiennent à cette classe :
+
+\[
+\mu_j=
+\frac{1}{|C_j|}
+\sum_{x_i\in C_j}x_i.
+\]
+
+Le critère de dispersion intra-classe est :
+
+\[
+J=
+\sum_{j=1}^{K}
+\sum_{x_i\in C_j}
+\left\|x_i-\mu_j\right\|^2.
+\]
+
+L'algorithme cherche donc une partition pour laquelle les observations sont relativement proches des prototypes de leurs classes.
+
+\subsection{Principe itératif}
+
+Le fonctionnement peut être résumé par l'alternance suivante :
+
+\begin{enumerate}
+    \item initialiser les $K$ prototypes ;
+    \item calculer les distances entre les observations et les prototypes ;
+    \item affecter chaque observation au prototype le plus proche ;
+    \item recalculer les prototypes ;
+    \item calculer la fonction objectif et le déplacement des prototypes ;
+    \item vérifier le critère d'arrêt ;
+    \item recommencer si la convergence n'est pas atteinte.
+\end{enumerate}
+
+\subsection{Critère de convergence}
+
+On définit le déplacement maximal des prototypes par :
+
+\[
+\Delta=
+\max_j
+\left\|
+\mu_j^{(t)}-\mu_j^{(t-1)}
+\right\|.
+\]
+
+Dans notre implémentation, l'algorithme s'arrête lorsque :
+
+\[
+\Delta < 10^{-4},
+\]
+
+ou lorsque le nombre maximal d'itérations, fixé à 100, est atteint.
+
+% ============================================================
+% 3 IMPLEMENTATION
+% ============================================================
+\section{Implémentation from scratch}
+
+L'implémentation est réalisée en Python. NumPy est utilisé pour les opérations numériques et Matplotlib pour les graphiques. Aucune fonction \texttt{sklearn.cluster.KMeans} n'est utilisée.
+
+La fonction de distance est calculée directement. Une classe \texttt{DynamicClouds} regroupe les principales opérations de l'algorithme.
+
+\subsection{Initialisation}
+
+Pour rendre l'expérience reproductible, une graine aléatoire égale à 42 est utilisée. Trois observations sont choisies comme prototypes initiaux.
+
+\subsection{Affectation}
+
+Pour chaque observation, le programme calcule sa distance à chacun des trois prototypes. L'observation reçoit l'étiquette du prototype associé à la distance minimale.
+
+\subsection{Mise à jour}
+
+Après l'affectation, les prototypes sont recalculés par moyenne :
+
+\[
+\mu_j=
+\frac{1}{|C_j|}
+\sum_{x_i\in C_j}x_i.
+\]
+
+Une précaution est prévue pour le cas d'une classe vide : le prototype concerné est réinitialisé avec une observation du jeu de données.
+
+\subsection{Pseudo-code}
+
+\begin{verbatim}
+Initialiser K prototypes
+
+Pour chaque itération :
+    Affecter chaque observation au prototype le plus proche
+
+    Pour chaque classe :
+        Calculer la moyenne des observations
+        Si la classe est vide :
+            Réinitialiser son prototype
+
+    Calculer la fonction objectif
+    Calculer le déplacement maximal des prototypes
+
+    Si déplacement < tolérance :
+        arrêter
+
+Retourner les prototypes et les labels
+\end{verbatim}
+
+\section{Jeu de données}
+
+Le jeu de données contient 360 observations en deux dimensions, réparties en trois groupes de 120 observations.
+
+Les centres théoriques utilisés pour la génération sont approximativement :
+
+\[
+(2,2),\qquad (7,3),\qquad (4.5,7).
+\]
+
+Un bruit gaussien est ajouté autour de ces centres afin de former trois nuages de points.
+
+\begin{table}[H]
+\centering
+\begin{tabular}{ll}
+\toprule
+\textbf{Paramètre} & \textbf{Valeur}\\
+\midrule
+Nombre d'observations & 360\\
+Dimension & 2\\
+Nombre de classes $K$ & 3\\
+Observations par nuage & 120\\
+Itérations maximales & 100\\
+Tolérance & $10^{-4}$\\
+Distance & Euclidienne\\
+Graine aléatoire & 42\\
+\bottomrule
+\end{tabular}
+\caption{Paramètres de l'expérimentation}
+\end{table}
+
+% ============================================================
+% 4 REPRESENTATION DES NUAGES
+% ============================================================
+\section{Représentation des nuages de points}
+
+La représentation graphique permet de visualiser la structure des données avant et après la classification. Chaque observation est représentée par un point dans un espace à deux dimensions.
+
+La figure suivante représente les trois nuages artificiels utilisés pour l'expérimentation. Les nuages sont centrés autour de trois zones différentes.
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}
+\begin{axis}[
+    width=14.5cm,
+    height=8cm,
+    xlabel={Variable 1},
+    ylabel={Variable 2},
+    grid=major,
+    legend style={at={(0.5,-0.18)},anchor=north,legend columns=3}
+]
+\addplot[only marks,mark=*,mark size=1.2pt]
+coordinates {
+(1.7,2.1)(2.2,1.8)(1.9,2.5)(2.4,2.2)(1.5,1.7)
+(2.1,2.8)(2.7,2.0)(1.3,2.3)(2.0,1.5)(2.5,2.6)
+(1.8,2.2)(2.3,1.9)(1.6,2.7)(2.8,2.4)(1.2,1.9)
+(2.1,2.4)(2.6,1.6)(1.7,1.4)(2.9,2.1)(1.9,2.9)
+};
+\addlegendentry{Nuage 1}
+
+\addplot[only marks,mark=triangle*,mark size=1.5pt]
+coordinates {
+(6.5,2.8)(7.2,3.1)(6.8,2.4)(7.5,3.4)(6.3,3.2)
+(7.8,2.7)(6.9,3.6)(7.1,2.2)(6.2,2.6)(7.6,3.0)
+(6.7,3.3)(7.4,2.5)(6.4,3.7)(7.9,3.2)(7.0,2.9)
+(6.1,3.0)(7.3,3.8)(6.6,2.1)(7.7,2.8)(7.0,3.4)
+};
+\addlegendentry{Nuage 2}
+
+\addplot[only marks,mark=square*,mark size=1.4pt]
+coordinates {
+(4.0,6.5)(4.7,7.2)(5.0,6.8)(4.3,7.6)(5.2,7.4)
+(3.8,7.0)(4.6,6.2)(5.4,7.1)(4.2,7.8)(4.9,6.5)
+(3.7,6.6)(5.1,7.7)(4.5,7.0)(5.5,6.8)(3.9,7.5)
+(4.8,7.9)(4.1,6.9)(5.3,7.3)(4.4,6.3)(4.9,7.1)
+};
+\addlegendentry{Nuage 3}
+\end{axis}
+\end{tikzpicture}
+\caption{Représentation des trois nuages de points}
+\end{figure}
+
+Cette représentation montre que les données présentent trois zones de concentration. Le rôle de l'algorithme est de retrouver automatiquement cette organisation à partir des distances entre les observations et les prototypes.
+
+% ============================================================
+% 5 RESULTATS
+% ============================================================
+\section{Expérimentation et résultats}
+
+Après l'initialisation, les prototypes sont progressivement déplacés vers les zones de concentration des observations. À chaque itération, les points sont réaffectés au prototype le plus proche.
+
+La représentation suivante illustre une partition finale typique des données. Les symboles des prototypes permettent de distinguer les centres des trois groupes.
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}
+\begin{axis}[
+    width=14.5cm,
+    height=8cm,
+    xlabel={Variable 1},
+    ylabel={Variable 2},
+    grid=major,
+    legend style={at={(0.5,-0.18)},anchor=north,legend columns=3}
+]
+\addplot[only marks,mark=*,mark size=1.1pt]
+coordinates {
+(1.7,2.1)(2.2,1.8)(1.9,2.5)(2.4,2.2)(1.5,1.7)(2.1,2.8)(2.7,2.0)(1.3,2.3)(2.0,1.5)(2.5,2.6)
+(1.8,2.2)(2.3,1.9)(1.6,2.7)(2.8,2.4)(1.2,1.9)(2.1,2.4)(2.6,1.6)(1.7,1.4)(2.9,2.1)(1.9,2.9)
+};
+\addlegendentry{Classe 1}
+
+\addplot[only marks,mark=triangle*,mark size=1.4pt]
+coordinates {
+(6.5,2.8)(7.2,3.1)(6.8,2.4)(7.5,3.4)(6.3,3.2)(7.8,2.7)(6.9,3.6)(7.1,2.2)(6.2,2.6)(7.6,3.0)
+(6.7,3.3)(7.4,2.5)(6.4,3.7)(7.9,3.2)(7.0,2.9)(6.1,3.0)(7.3,3.8)(6.6,2.1)(7.7,2.8)(7.0,3.4)
+};
+\addlegendentry{Classe 2}
+
+\addplot[only marks,mark=square*,mark size=1.3pt]
+coordinates {
+(4.0,6.5)(4.7,7.2)(5.0,6.8)(4.3,7.6)(5.2,7.4)(3.8,7.0)(4.6,6.2)(5.4,7.1)(4.2,7.8)(4.9,6.5)
+(3.7,6.6)(5.1,7.7)(4.5,7.0)(5.5,6.8)(3.9,7.5)(4.8,7.9)(4.1,6.9)(5.3,7.3)(4.4,6.3)(4.9,7.1)
+};
+\addlegendentry{Classe 3}
+
+\addplot[only marks,mark=x,mark size=4pt]
+coordinates {(2.0,2.2)};
+\addplot[only marks,mark=x,mark size=4pt]
+coordinates {(7.0,3.0)};
+\addplot[only marks,mark=x,mark size=4pt]
+coordinates {(4.5,7.0)};
+\end{axis}
+\end{tikzpicture}
+\caption{Partition finale et prototypes}
+\end{figure}
+
+Les centres finaux doivent se rapprocher des zones de forte densité des données. La qualité du regroupement est donc interprétée à partir de la proximité des points avec leurs prototypes et de la séparation visuelle des nuages.
+
+\section{Analyse de la convergence}
+
+La fonction objectif permet de suivre la qualité de la partition à chaque itération :
+
+\[
+J^{(t)}=
+\sum_{j=1}^{K}
+\sum_{x_i\in C_j^{(t)}}
+\left\|x_i-\mu_j^{(t)}\right\|^2.
+\]
+
+Une diminution de $J$ signifie que les observations sont globalement plus proches des prototypes associés.
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}
+\begin{axis}[
+    width=14.5cm,
+    height=6.5cm,
+    xlabel={Itération},
+    ylabel={Fonction objectif},
+    grid=major
+]
+\addplot[mark=*,mark size=1.5pt]
+coordinates {
+(1,520)(2,300)(3,190)(4,155)(5,145)(6,141)(7,139)(8,138)(9,138)(10,138)
+};
+\end{axis}
+\end{tikzpicture}
+\caption{Illustration de la convergence de la fonction objectif}
+\end{figure}
+
+La stabilisation de la courbe traduit la stabilisation progressive de la partition. Dans le programme Python, le critère d'arrêt est basé sur le déplacement maximal des prototypes. Lorsque celui-ci devient inférieur à la tolérance, l'exécution est arrêtée.
+
+% ============================================================
+% 6 DISCUSSION CONCLUSION
+% ============================================================
+\section{Discussion}
+
+L'implémentation réalisée permet de comprendre les mécanismes internes d'un algorithme de clustering. Elle montre qu'une méthode de classification peut être construite à partir d'opérations simples : calcul des distances, affectation, moyenne et test de convergence.
+
+Le premier élément à considérer est le nombre de classes. Dans notre expérience, $K=3$ est fixé parce que le jeu de données a été construit autour de trois nuages. Pour des données réelles, ce nombre peut nécessiter une analyse complémentaire.
+
+Le deuxième élément est l'initialisation. Deux initialisations différentes peuvent conduire à des prototypes finaux différents, notamment lorsque les groupes se chevauchent. La reproductibilité est donc importante lors de l'expérimentation.
+
+Enfin, la méthode est sensible aux valeurs aberrantes, puisque les prototypes sont calculés par moyenne. La distance euclidienne est également plus adaptée à certaines structures de données qu'à d'autres.
+
+\section{Complexité algorithmique}
+
+Pour $n$ observations, $d$ variables, $K$ classes et $T$ itérations, le calcul des distances est de l'ordre de :
+
+\[
+O(nKd).
+\]
+
+La mise à jour des prototypes est approximativement de l'ordre de :
+
+\[
+O(nd).
+\]
+
+La complexité globale est donc approximativement :
+
+\[
+O(TnKd).
+\]
+
+Cette complexité augmente avec la taille du jeu de données, la dimension, le nombre de classes et le nombre d'itérations.
+
+\section{Organisation du projet et GitHub}
+
+Le projet est organisé de la manière suivante :
+
+\begin{verbatim}
+TP-nuees-dynamiques/
+|-- nuees_dynamiques.py
+|-- rapport_nuees_dynamiques.tex
+|-- README.md
+|-- requirements.txt
+`-- figures/
+\end{verbatim}
+
+Le fichier Python contient l'implémentation from scratch. Le rapport LaTeX présente la démarche scientifique. Le fichier README explique l'installation et l'exécution. Le dépôt GitHub permet au professeur d'accéder directement au code source.
+
+\section{Conclusion}
+
+Ce TP a permis d'étudier et d'implémenter l'algorithme des nuées dynamiques dans le cadre de la classification non supervisée. L'implémentation repose sur une alternance entre l'affectation des observations aux prototypes les plus proches et la mise à jour des prototypes.
+
+L'expérimentation sur trois nuages de points bidimensionnels permet de visualiser le fonctionnement de la méthode et la convergence progressive des prototypes. Le travail montre également l'importance du choix du nombre de classes, de l'initialisation et de la métrique de distance.
+
+Cette implémentation constitue une base pratique pour approfondir l'apprentissage non supervisé, comparer différentes stratégies d'initialisation et étudier d'autres algorithmes de clustering.
+
+\section*{Références}
+
+\begin{enumerate}
+    \item MacQueen, J. (1967). \textit{Some Methods for Classification and Analysis of Multivariate Observations}.
+    \item Jain, A. K. (2010). \textit{Data clustering: 50 years beyond K-means}. Pattern Recognition Letters.
+    \item Bishop, C. M. (2006). \textit{Pattern Recognition and Machine Learning}. Springer.
+\end{enumerate}
+
+\end{document}
